@@ -9,6 +9,10 @@ const UserSchema = new mongoose.Schema({
     enum: ["delivery", "finance", "admin"],
     default: "delivery",
   },
+  blocked: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const UserModel = mongoose.model("users", UserSchema);
