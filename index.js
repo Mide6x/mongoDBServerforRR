@@ -17,6 +17,7 @@ mongoose.connect("mongodb://localhost:27017/employee", {
   useUnifiedTopology: true,
 });
 
+// Endpoint for user login
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   UserModel.findOne({ email: email }).then((user) => {
@@ -39,6 +40,7 @@ app.post("/login", (req, res) => {
   });
 });
 
+// Endpoint for user registration
 app.post("/register", (req, res) => {
   UserModel.create(req.body)
     .then((users) => res.json(users))
@@ -119,6 +121,19 @@ app.post(
         console.error("Error saving receipt:", err);
         res.status(500).json(err);
       });
+  }
+);
+
+// Endpoint to get all receipts
+app.get(
+  "/receipts",
+  authenticateJWT,
+  authorizeRoles("delivery"),
+  (req, res) => {
+    ReceiptModel.find()
+      .populate("uploader", "email") // Populate uploader field with email
+      .then((receipts) => res.json(receipts))
+      .catch((err) => res.status(500).json(err));
   }
 );
 
