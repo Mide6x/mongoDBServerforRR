@@ -137,6 +137,52 @@ app.get(
   }
 );
 
+// Endpoint to get profile page
+app.get("/profile", authenticateJWT, (req, res) => {
+  UserModel.findById(req.user._id)
+    .then((user) => res.json(user))
+    .catch((err) => res.status(500).json(err));
+});
+
+// Endpoint to Update Profile
+app.put("/profile", authenticateJWT, (req, res) => {
+  const { phoneNumber, deliveryArea, homeAddress } = req.body;
+
+  const updateFields = {
+    deliveryArea,
+    homeAddress,
+  };
+
+  if (req.body.phoneNumber && !req.user.phoneNumberUpdated) {
+    updateFields.phoneNumber = req.body.phoneNumber;
+    updateFields.phoneNumberUpdated = true;
+  }
+
+  UserModel.findByIdAndUpdate(req.user._id, updateFields, { new: true })
+    .then((user) => res.json(user))
+    .catch((err) => res.status(500).json(err));
+});
+
+//Endpoint to Update profile picture
+app.post(
+  "/profile-picture",
+  authenticateJWT,
+  upload.single("profilePicture"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    UserModel.findByIdAndUpdate(
+      req.user._id,
+      { profilePicture: req.file.path },
+      { new: true }
+    )
+      .then((user) => res.json(user))
+      .catch((err) => res.status(500).json(err));
+  }
+);
+
 app.listen(3001, () => {
   console.log("server is running");
 });
