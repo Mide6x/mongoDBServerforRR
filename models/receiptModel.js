@@ -10,6 +10,10 @@ const ReceiptSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  storeName: {
+    type: String,
+    required: true,
+  },
   uploadDate: {
     type: Date,
     default: Date.now,

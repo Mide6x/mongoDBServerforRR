@@ -6,6 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const UserModel = require("./models/registerModel");
 const ReceiptModel = require("./models/receiptModel");
+const NotificationModel = require("./models/notificationsModel");
 const { authenticateJWT, authorizeRoles } = require("./middleware/auth");
 
 const app = express();
@@ -16,6 +17,9 @@ mongoose.connect("mongodb://localhost:27017/employee", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
+
+//Cron
+require("./cron/resetExpiredAcceptances");
 
 // Endpoint for user login
 app.post("/login", (req, res) => {
@@ -28,7 +32,9 @@ app.post("/login", (req, res) => {
         const token = jwt.sign(
           { email: user.email, role: user.role },
           "your_jwt_secret",
-          { expiresIn: "1h" }
+          {
+            expiresIn: "1h",
+          }
         );
         res.json({ token });
       } else {
@@ -98,6 +104,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Endpoint to Upload receipt
 app.post(
   "/upload-receipt",
   authenticateJWT,
@@ -109,9 +116,15 @@ app.post(
       return res.status(400).json({ error: "No file uploaded" });
     }
 
+    const { storeName } = req.body;
+    if (!storeName) {
+      return res.status(400).json({ error: "Store name is required" });
+    }
+
     const newReceipt = new ReceiptModel({
-      uploader: req.user._id, // Set uploader to the user's ID
+      uploader: req.user._id,
       fileUrl: req.file.path,
+      storeName: storeName,
     });
 
     newReceipt
@@ -182,6 +195,116 @@ app.post(
       .catch((err) => res.status(500).json(err));
   }
 );
+
+// Endpoint for Notification Upload
+app.post(
+  "/notifications",
+  authenticateJWT,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    const { deliveryArea, storeName, sellerContact, item, quantity } = req.body;
+
+    if (!deliveryArea || !storeName || !sellerContact || !item || !quantity) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    try {
+      const notification = new NotificationModel({
+        deliveryArea,
+        storeName,
+        sellerContact,
+        item,
+        quantity,
+      });
+
+      await notification.save();
+      res.status(201).json({ message: "Notification created successfully" });
+    } catch (err) {
+      console.error("Error creating notification:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// Endpoint to Fetch Notifications
+app.get("/notifications", authenticateJWT, async (req, res) => {
+  const deliveryArea = req.user.deliveryArea; // Assuming `deliveryArea` is part of the user data
+
+  try {
+    const notifications = await NotificationModel.find({
+      deliveryArea,
+    });
+    res.status(200).json(notifications);
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Endpoint for accepting delivery
+app.post("/notifications/:id/accept", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user._id;
+
+  try {
+    let notification = await NotificationModel.findById(id);
+
+    if (notification.accepted) {
+      return res.status(400).json({
+        error: "This delivery notification has already been accepted.",
+      });
+    }
+
+    notification.accepted = true;
+    notification.acceptedBy = userId;
+    notification.acceptedAt = new Date();
+    await notification.save();
+
+    res.status(200).json(notification);
+  } catch (err) {
+    console.error("Error accepting notification:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Endpoint for marking delivery as delivered
+app.post("/notifications/:id/delivered", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user._id;
+
+  try {
+    let notification = await NotificationModel.findById(id);
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    if (notification.acceptedBy.toString() !== userId.toString()) {
+      return res
+        .status(403)
+        .json({ error: "You did not accept this delivery" });
+    }
+
+    notification.deliveredAt = new Date();
+    await notification.save();
+
+    res.status(200).json(notification);
+  } catch (err) {
+    console.error("Error marking notification as delivered:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/receipts/user/:userId", async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const receipts = await ReceiptModel.find({ uploader: userId }).exec();
+    res.json(receipts);
+  } catch (err) {
+    console.error("Error fetching receipts:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 app.listen(3001, () => {
   console.log("server is running");
