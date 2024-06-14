@@ -91,11 +91,10 @@ app.put(
   }
 );
 
-// Endpoint for receipt upload (delivery only)
-
+// Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, path.join(__dirname, "..", "receiptreconcile", "uploads")); // Adjust the path to point to the frontend's uploads folder
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -104,7 +103,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Endpoint to Upload receipt
+// Endpoint to Upload receipt - Delivery
 app.post(
   "/upload-receipt",
   authenticateJWT,
@@ -121,9 +120,11 @@ app.post(
       return res.status(400).json({ error: "Store name is required" });
     }
 
+    const fileUrl = `uploads/${req.file.filename}`; // Path relative to the frontend
+
     const newReceipt = new ReceiptModel({
       uploader: req.user._id,
-      fileUrl: req.file.path,
+      fileUrl: fileUrl,
       storeName: storeName,
     });
 
@@ -134,6 +135,43 @@ app.post(
         console.error("Error saving receipt:", err);
         res.status(500).json(err);
       });
+  }
+);
+
+// Endpoint to upload receipts - Finance
+app.post(
+  "/receipts/upload",
+  authenticateJWT,
+  authorizeRoles("finance"),
+  upload.array("receipts", 30),
+  async (req, res) => {
+    const uploader = req.user._id;
+    const storeName = req.body.storeName || "N/A"; // Default to "N/A" if not provided
+
+    if (!req.files || req.files.length < 1) {
+      return res
+        .status(400)
+        .json({ error: "At least one file must be uploaded" });
+    }
+
+    try {
+      const receiptPromises = req.files.map((file) => {
+        const fileUrl = `uploads/${file.filename}`; // Path relative to the frontend
+        const newReceipt = new ReceiptModel({
+          uploader,
+          fileUrl: fileUrl,
+          storeName,
+        });
+        return newReceipt.save();
+      });
+
+      await Promise.all(receiptPromises);
+
+      res.status(200).json({ message: "Receipts uploaded successfully" });
+    } catch (err) {
+      console.error("Error uploading receipts:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 );
 
