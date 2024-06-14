@@ -295,6 +295,21 @@ app.post("/notifications/:id/delivered", authenticateJWT, async (req, res) => {
   }
 });
 
+// Endpoint to Fetch Accepted Notifications for Admin
+app.get("/notifications/accepted", authenticateJWT, async (req, res) => {
+  try {
+    const notifications = await NotificationModel.find({
+      accepted: true,
+    }).populate("acceptedBy", "email");
+
+    res.status(200).json(notifications);
+  } catch (err) {
+    console.error("Error fetching accepted notifications:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Endpoint to get Receipts
 app.get("/receipts/user/:userId", async (req, res) => {
   const userId = req.params.userId;
   try {
