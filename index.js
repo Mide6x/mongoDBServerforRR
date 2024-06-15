@@ -18,6 +18,12 @@ mongoose.connect("mongodb://localhost:27017/employee", {
   useUnifiedTopology: true,
 });
 
+// Static middleware to serve files from the uploads directory
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "..", "receiptreconcile", "uploads"))
+);
+
 //Cron
 require("./cron/resetExpiredAcceptances");
 
@@ -214,7 +220,7 @@ app.put("/profile", authenticateJWT, (req, res) => {
     .catch((err) => res.status(500).json(err));
 });
 
-//Endpoint to Update profile picture
+// Endpoint to update profile picture
 app.post(
   "/profile-picture",
   authenticateJWT,
@@ -226,13 +232,32 @@ app.post(
 
     UserModel.findByIdAndUpdate(
       req.user._id,
-      { profilePicture: req.file.path },
+      { profilePicture: req.file.filename }, // Store only the filename
       { new: true }
     )
       .then((user) => res.json(user))
       .catch((err) => res.status(500).json(err));
   }
 );
+
+// Endpoint to fetch profile picture
+app.get("/profile-picture/:filename", (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(
+    __dirname,
+    "..",
+    "receiptreconcile",
+    "uploads",
+    filename
+  );
+
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    res.sendFile(filePath);
+  });
+});
 
 // Endpoint for Notification Upload
 app.post(
@@ -265,12 +290,14 @@ app.post(
 );
 
 // Endpoint to Fetch Notifications
+// Endpoint to Fetch Notifications
 app.get("/notifications", authenticateJWT, async (req, res) => {
   const deliveryArea = req.user.deliveryArea; // Assuming `deliveryArea` is part of the user data
 
   try {
     const notifications = await NotificationModel.find({
       deliveryArea,
+      accepted: false, // This will exclude notifications that have been accepted
     });
     res.status(200).json(notifications);
   } catch (err) {
