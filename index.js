@@ -290,14 +290,14 @@ app.post(
 );
 
 // Endpoint to Fetch Notifications
-// Endpoint to Fetch Notifications
 app.get("/notifications", authenticateJWT, async (req, res) => {
   const deliveryArea = req.user.deliveryArea; // Assuming `deliveryArea` is part of the user data
 
   try {
     const notifications = await NotificationModel.find({
       deliveryArea,
-      accepted: false, // This will exclude notifications that have been accepted
+      accepted: false,
+      deliveredAt: null,
     });
     res.status(200).json(notifications);
   } catch (err) {
