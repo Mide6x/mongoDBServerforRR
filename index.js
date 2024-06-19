@@ -413,6 +413,67 @@ app.get("/receipts/user/:userId", async (req, res) => {
   }
 });
 
+// Endpoint to fetch orders completed by logged-in delivery person
+app.get("/orders-completed", authenticateJWT, async (req, res) => {
+  const userId = req.user._id;
+
+  try {
+    const completedOrders = await NotificationModel.countDocuments({
+      acceptedBy: userId,
+      deliveredAt: { $ne: null }, // Filter for orders that have been delivered
+    });
+
+    const uploadedReceipts = await ReceiptModel.countDocuments({
+      uploader: userId,
+    });
+
+    res.status(200).json({
+      completedOrders,
+      uploadedReceipts,
+    });
+  } catch (err) {
+    console.error("Error fetching orders and receipts:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Endpoint to fetch orders completed by the logged-in user in the last 24 hours
+app.get("/orders-completed-last-24h", authenticateJWT, async (req, res) => {
+  const userId = req.user._id;
+
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const ordersCompletedLast24Hrs = await NotificationModel.countDocuments({
+      acceptedBy: userId,
+      deliveredAt: { $ne: null },
+      acceptedAt: { $gte: twentyFourHoursAgo },
+    });
+
+    res.status(200).json({ ordersCompletedLast24Hrs });
+  } catch (err) {
+    console.error("Error fetching completed orders:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Endpoint to fetch total orders in the last 24 hours
+app.get("/orders-total-last-24h", authenticateJWT, async (req, res) => {
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const totalOrdersLast24Hrs = await NotificationModel.countDocuments({
+      deliveredAt: { $ne: null },
+      acceptedAt: { $gte: twentyFourHoursAgo },
+    });
+
+    res.status(200).json({ totalOrdersLast24Hrs });
+  } catch (err) {
+    console.error("Error fetching total orders:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.listen(3001, () => {
   console.log("server is running");
 });
