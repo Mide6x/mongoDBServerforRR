@@ -291,13 +291,15 @@ app.post(
 
 // Endpoint to Fetch Notifications
 app.get("/notifications", authenticateJWT, async (req, res) => {
-  const deliveryArea = req.user.deliveryArea; // Assuming `deliveryArea` is part of the user data
+  const deliveryArea = req.user.deliveryArea;
+  const userId = req.user._id;
 
   try {
     const notifications = await NotificationModel.find({
-      deliveryArea,
-      accepted: false,
-      deliveredAt: null,
+      $or: [
+        { deliveryArea, accepted: false, deliveredAt: null }, // Pending notifications
+        { acceptedBy: userId, deliveredAt: null }, // Accepted but not delivered notifications
+      ],
     });
     res.status(200).json(notifications);
   } catch (err) {
@@ -361,18 +363,43 @@ app.post("/notifications/:id/delivered", authenticateJWT, async (req, res) => {
 });
 
 // Endpoint to Fetch Accepted Notifications for Admin
-app.get("/notifications/accepted", authenticateJWT, async (req, res) => {
-  try {
-    const notifications = await NotificationModel.find({
-      accepted: true,
-    }).populate("acceptedBy", "email");
+app.get(
+  "/notifications/accepted",
+  authenticateJWT,
+  authorizeRoles("admin"),
+  async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "acceptedAt",
+        order = "desc",
+      } = req.query;
 
-    res.status(200).json(notifications);
-  } catch (err) {
-    console.error("Error fetching accepted notifications:", err);
-    res.status(500).json({ error: "Internal server error" });
+      const notifications = await NotificationModel.find({
+        accepted: true,
+      })
+        .populate("acceptedBy", "email")
+        .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit));
+
+      const totalNotifications = await NotificationModel.countDocuments({
+        accepted: true,
+      });
+
+      res.status(200).json({
+        notifications,
+        totalNotifications,
+        totalPages: Math.ceil(totalNotifications / limit),
+        currentPage: parseInt(page),
+      });
+    } catch (err) {
+      console.error("Error fetching accepted notifications:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
+);
 
 // Endpoint to get Receipts
 app.get("/receipts/user/:userId", async (req, res) => {

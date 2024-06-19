@@ -1,44 +1,21 @@
 const mongoose = require("mongoose");
 
-const NotificationSchema = new mongoose.Schema({
-  deliveryArea: {
-    type: String,
-    required: true,
-  },
-  storeName: {
-    type: String,
-    required: true,
-  },
-  sellerContact: {
-    type: String,
-    required: true,
-  },
-  item: {
-    type: String,
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-  },
+const notificationSchema = new mongoose.Schema({
+  deliveryArea: String,
+  storeName: String,
+  sellerContact: String,
+  item: String,
+  quantity: Number,
+  accepted: { type: Boolean, default: false },
   acceptedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
     default: null,
   },
-  acceptedAt: {
-    type: Date,
-    default: null,
-  },
-  deliveredAt: {
-    type: Date,
-    default: null,
-  },
-  accepted: {
-    type: Boolean,
-    default: false,
-  },
+  acceptedAt: { type: Date, default: null },
+  deliveredAt: { type: Date, default: null },
 });
 
-const NotificationModel = mongoose.model("notifications", NotificationSchema);
+const NotificationModel = mongoose.model("Notification", notificationSchema);
+
 module.exports = NotificationModel;
