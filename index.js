@@ -4,6 +4,8 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs"); // Add fs module
+const tesseract = require("tesseract.js"); // Import tesseract.js
 const UserModel = require("./models/registerModel");
 const ReceiptModel = require("./models/receiptModel");
 const NotificationModel = require("./models/notificationsModel");
@@ -471,6 +473,42 @@ app.get("/orders-total-last-24h", authenticateJWT, async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// Endpoint to fetch receipts and convert to text using Tesseract OCR
+app.get(
+  "/receipts/ocr",
+  authenticateJWT,
+  authorizeRoles("finance"),
+  async (req, res) => {
+    try {
+      const receipts = await ReceiptModel.find().exec();
+
+      const ocrPromises = receipts.map(async (receipt) => {
+        const filePath = path.join(
+          __dirname,
+          "..",
+          "receiptreconcile",
+          receipt.fileUrl
+        );
+
+        const ocrResult = await tesseract.recognize(filePath, "eng");
+        return {
+          receiptId: receipt._id,
+          dateUploaded: receipt.uploadDate,
+          text: ocrResult.data.text,
+        };
+      });
+
+      const ocrResults = await Promise.all(ocrPromises);
+
+      res.json(ocrResults);
+      console.log(ocrResults);
+    } catch (err) {
+      console.error("Error performing OCR on receipts:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 app.listen(3001, () => {
   console.log("server is running");
