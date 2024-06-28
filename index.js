@@ -24,9 +24,6 @@ app.use(
   express.static(path.join(__dirname, "..", "receiptreconcile", "uploads"))
 );
 
-//Cron
-require("./cron/resetExpiredAcceptances");
-
 // Endpoint for user login
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
@@ -203,11 +200,12 @@ app.get("/profile", authenticateJWT, (req, res) => {
 
 // Endpoint to Update Profile
 app.put("/profile", authenticateJWT, (req, res) => {
-  const { phoneNumber, deliveryArea, homeAddress } = req.body;
+  const { phoneNumber, deliveryArea, homeAddress, adminRole } = req.body;
 
   const updateFields = {
     deliveryArea,
     homeAddress,
+    adminRole,
   };
 
   if (req.body.phoneNumber && !req.user.phoneNumberUpdated) {

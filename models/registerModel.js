@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema({
   profilePicture: { type: String },
   phoneNumber: { type: String },
   deliveryArea: { type: String },
+  adminRole: { type: String },
   homeAddress: { type: String },
   emailUpdated: { type: Boolean, default: false },
   phoneNumberUpdated: { type: Boolean, default: false },
